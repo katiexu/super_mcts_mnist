@@ -19,12 +19,12 @@ def get_param_num(model):
 
 
 def display(metrics):
-    print("\nTest mae: {}".format(metrics['mae']))
+    # print("\nTest mae: {}".format(metrics['mae']))
     # print("Test correlation: {}".format(metrics['corr']))
     # print("Test multi-class accuracy: {}".format(metrics['multi_acc']))
     # print("Test binary accuracy: {}".format(metrics['bi_acc']))
     # print("Test f1 score: {}".format(metrics['f1']))
-
+    pass
 
 def train(model, data_loader, optimizer, criterion, args):
     model.train()
@@ -50,25 +50,43 @@ def test(model, data_loader, criterion, args):
             total_loss += instant_loss
     # total_loss /= len(data_loader.dataset)
     total_loss /= len(data_loader)
+
     return total_loss
 
 
 def evaluate(model, data_loader, args):
     model.eval()
     metrics = {}
+    target_all = []
+    output_all = []
     with torch.no_grad():
-        data_image, target = next(iter(data_loader))
-        data_image = data_image.to(args.device)
-        output = model(data_image)
-    output = output.cpu().numpy()
-    target = target.numpy()
-    metrics['mae'] = np.mean(np.absolute(output - target)).item()
-    metrics['corr'] = np.corrcoef(output, target)[0][1].item()
-    metrics['multi_acc'] = round(sum(np.round(output) == np.round(target)) / float(len(target)), 5).item()
-    true_label = (target >= 0)
-    pred_label = (output >= 0)
-    metrics['bi_acc'] = accuracy_score(true_label, pred_label).item()
-    metrics['f1'] = f1_score(true_label, pred_label, average='weighted').item()
+        for data_image, target in data_loader:
+            data_image, target = data_image.to(args.device), target.to(args.device)
+            output = model(data_image)
+
+            target_all.append(target)
+            output_all.append(output)
+        target_all = torch.cat(target_all, dim=0)
+        output_all = torch.cat(output_all, dim=0)
+
+    _, indices = output_all.topk(1, dim=1)
+    masks = indices.eq(target_all.view(-1, 1).expand_as(indices))
+    size = target_all.shape[0]
+    corrects = masks.sum().item()
+    accuracy = corrects / size
+
+    # print(f"{split} set accuracy: {accuracy}")
+    print(f"test set accuracy: {accuracy}\n")
+
+    metrics['acc'] = accuracy
+
+    # metrics['mae'] = np.mean(np.absolute(output - target)).item()
+    # metrics['corr'] = np.corrcoef(output, target)[0][1].item()
+    # metrics['multi_acc'] = round(sum(np.round(output) == np.round(target)) / float(len(target)), 5).item()
+    # true_label = (target >= 0)
+    # pred_label = (output >= 0)
+    # metrics['bi_acc'] = accuracy_score(true_label, pred_label).item()
+    # metrics['f1'] = f1_score(true_label, pred_label, average='weighted').item()
     return metrics
 
 
@@ -145,7 +163,7 @@ def Scheme(design, weight=None):
     metrics = evaluate(best_model, test_loader, args)
     display(metrics)
     report = {'train_loss_list': train_loss_list, 'val_loss_list': val_loss_list,
-              'best_val_loss': best_val_loss, 'mae': metrics['mae']}
+              'best_val_loss': best_val_loss, 'acc': metrics['acc']}
 
     ## store classical weights
     # del best_model.QuantumLayer
