@@ -139,7 +139,7 @@ class TQLayer(tq.QuantumModule):
                 # single-qubit parametric gates
                 if self.design['rot' + str(layer) + str(q)] == 'U3':
                     self.rots.append(tq.U3(has_params=True, trainable=rot_trainable,
-                                           init_params=self.q_params_rot[q][layer].reshape((1,))))
+                                           init_params=self.q_params_enta[q][layer*3:(layer+1)*3].reshape((3,))))
                 # else:
                 #     self.rots.append(tq.RY(has_params=True, trainable=rot_trainable,
                 #                            init_params=self.q_params_rot[q][layer].reshape((1,))))
