@@ -121,7 +121,7 @@ class TQLayer(tq.QuantumModule):
 
         self.q_params_rot, self.q_params_enta = [], []
         for i in range(self.args.n_qubits):
-            self.q_params_rot.append(pi * torch.rand(self.design['n_layers']))
+            self.q_params_rot.append(pi * torch.rand(3 * self.design['n_layers'])) # each U3 gate needs 3 parameter
             self.q_params_enta.append(pi * torch.rand(3 * self.design['n_layers'])) # each CU3 gate needs 3 parameters
 
         for layer in range(self.design['n_layers']):
