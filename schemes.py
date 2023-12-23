@@ -41,6 +41,8 @@ def train(model, data_loader, optimizer, criterion, args):
 def test(model, data_loader, criterion, args):
     model.eval()
     total_loss = 0
+    target_all = []
+    output_all = []
     with torch.no_grad():
         for data_image, target in data_loader:
             data_image = data_image.to(args.device)
@@ -48,10 +50,19 @@ def test(model, data_loader, criterion, args):
             output = model(data_image)
             instant_loss = criterion(output, target).item()
             total_loss += instant_loss
-    # total_loss /= len(data_loader.dataset)
-    total_loss /= len(data_loader)
+            target_all.append(target)
+            output_all.append(output)
+        target_all = torch.cat(target_all, dim=0)
+        output_all = torch.cat(output_all, dim=0)
 
-    return total_loss
+    total_loss /= len(data_loader)
+    _, indices = output_all.topk(1, dim=1)
+    masks = indices.eq(target_all.view(-1, 1).expand_as(indices))
+    size = target_all.shape[0]
+    corrects = masks.sum().item()
+    accuracy = corrects / size
+
+    return total_loss, accuracy
 
 
 def evaluate(model, data_loader, args):
@@ -139,15 +150,18 @@ def Scheme(design, weight=None):
     #     ], lr=args.clr)
     optimizer = optim.Adam(model.QuantumLayer.parameters(), lr=args.qlr)
     train_loss_list, val_loss_list = [], []
+    train_acc_list, val_acc_list = [], []
     best_val_loss = 10000
 
     start = time.time()
     for epoch in range(args.epochs):
         train(model, train_loader, optimizer, criterion, args)
-        train_loss = test(model, train_loader, criterion, args)
+        train_loss, train_acc = test(model, train_loader, criterion, args)
         train_loss_list.append(train_loss)
-        val_loss = test(model, val_loader, criterion, args)
+        train_acc_list.append(train_acc)
+        val_loss, val_acc = test(model, val_loader, criterion, args)
         val_loss_list.append(val_loss)
+        val_acc_list.append(val_acc)
         # if val_loss < best_val_loss:
         #     best_val_loss = val_loss
         #     print(epoch, train_loss, val_loss, 'saving model')
@@ -156,7 +170,8 @@ def Scheme(design, weight=None):
         #     print(epoch, train_loss, val_loss)
         # metrics = evaluate(model, test_loader, args)
         # display(metrics)
-        print(epoch, train_loss, val_loss)
+        print(f"Epoch: {epoch},", f"train loss: {train_loss},", f"train set accuracy: {train_acc},", f"valid loss: {val_loss},", f"valid set accuracy: {val_acc}")
+        # print(epoch, train_loss, train_acc, val_loss, val_acc)
     end = time.time()
     # print("Running time: %s seconds" % (end - start))
     best_model = model
